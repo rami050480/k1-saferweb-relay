@@ -16,15 +16,17 @@ export default async function handler(req, res) {
     const fetchWithApiKey = (url) =>
       fetch(url, {
         headers: { 'x-api-key': SAFERWEB_API_KEY },
-      }).then(res => res.json());
+      }).then(r => r.json());
 
+    // Snapshot: MC or USDOT
     const snapshotUrl = mc_number
       ? `https://saferwebapi.com/v2/mcmx/snapshot/${mc_number}`
       : `https://saferwebapi.com/v2/usdot/snapshot/${usdot_number}`;
 
+    // Historical records
     const inspectionUrl = `https://saferwebapi.com/v3/history/inspection/${carrier_id}`;
-    const violationUrl = `https://saferwebapi.com/v3/history/violation/${carrier_id}`;
-    const crashUrl = `https://saferwebapi.com/v3/history/crash/${carrier_id}`;
+    const violationUrl  = `https://saferwebapi.com/v3/history/violation/${carrier_id}`;
+    const crashUrl      = `https://saferwebapi.com/v3/history/crash/${carrier_id}`;
 
     const [snapshot, inspections, violations, crashes] = await Promise.all([
       fetchWithApiKey(snapshotUrl),
@@ -33,33 +35,37 @@ export default async function handler(req, res) {
       fetchWithApiKey(crashUrl)
     ]);
 
-    const crashRecords = crashes.crash_records || [];
-    const crash_count = crashRecords.length;
-    const fatal_crashes = crashRecords.filter(c => (c.total_fatalities || c.fatalities || 0) > 0).length;
+    const crashRecords   = crashes.crash_records || [];
+    const crash_count    = crashRecords.length;
+    const fatal_crashes  = crashRecords.filter(c => (c.total_fatalities || c.fatalities || 0) > 0).length;
     const violations_count = (violations.violation_records || []).length;
     const inspection_count = (inspections.inspection_records || []).length;
 
+    // Weighted scoring
+    const maxViolations  = 200;
+    const maxInspections = 300;
+    const maxCrashes     = 100;
     let score = 100;
-    score -= violations_count * 2;
-    score -= inspection_count;
-    score -= crash_count * 5;
-    score -= fatal_crashes * 15;
+    score -= (violations_count / maxViolations) * 40;
+    score -= (inspection_count / maxInspections) * 30;
+    score -= (crash_count / maxCrashes) * 20;
+    score -= fatal_crashes * 10;
     const total_score = Math.max(0, Math.min(100, score));
 
+    // Grades
     let grade = 'F';
-    if (total_score >= 95) grade = 'A+';
-    else if (total_score >= 90) grade = 'A';
-    else if (total_score >= 85) grade = 'B+';
+    if (total_score >= 90)      grade = 'A';
     else if (total_score >= 80) grade = 'B';
-    else if (total_score >= 75) grade = 'C+';
     else if (total_score >= 70) grade = 'C';
-    else if (total_score >= 65) grade = 'D';
+    else if (total_score >= 50) grade = 'D';
 
+    // Status and auto-reject
     let auto_reject = 'false';
     let reasons = [];
-    const status = snapshot.carrier_status || 'Unknown';
+    const status = snapshot.operating_status || snapshot.carrier_status || 'Unknown';
+    const normalizedStatus = typeof status === 'string' ? status.toUpperCase() : status;
 
-    if (status !== 'Active') {
+    if (normalizedStatus !== 'ACTIVE') {
       auto_reject = 'true';
       reasons.push(`Carrier status: ${status}`);
     }
@@ -67,21 +73,21 @@ export default async function handler(req, res) {
       auto_reject = 'true';
       reasons.push(`Fatal crashes: ${fatal_crashes}`);
     }
-    if (total_score < 60) {
+    if (total_score < 50) {
       auto_reject = 'true';
       reasons.push(`Score too low: ${total_score}`);
     }
 
     return res.status(200).json({
       carrier_name: snapshot.legal_name || 'N/A',
-      dba: snapshot.dba_name || 'N/A',
+      dba:          snapshot.dba_name   || 'N/A',
       mc_number,
       usdot_number: carrier_id,
       carrier_status: status,
       total_score,
       grade,
       inspections_count: inspection_count,
-      violations_count: violations_count,
+      violations_count:  violations_count,
       crash_count,
       fatal_crashes,
       auto_reject,
