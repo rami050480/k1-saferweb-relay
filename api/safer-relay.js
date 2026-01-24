@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     // Query SAFER API for carrier info
     const query = usdot_number || mc_number;
     const saferResponse = await fetch(
-      `${SAFER_BASE_URL}/CarrierSnapshot?query=${query}&format=json`
+      `${SAFER_BASE_URL}/CarrierSnapshot?query=${query}&webKey=${SAFER_API_KEY}&format=json`
     );
 
     if (!saferResponse.ok) {
