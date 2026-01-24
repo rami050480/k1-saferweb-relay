@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'MC or USDOT number required' });
   }
 
-  const SAFERWEB_API_KEY = '9040244958f64168aca034beeabb9c96'; // Use secure .env later
+  const SAFERWEB_API_KEY = 'f954a18ce8b648c2be8925bcc94e7e28'; // Use secure .env later
   const carrier_id = usdot_number || mc_number;
 
   try {
