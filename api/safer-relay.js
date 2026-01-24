@@ -13,22 +13,31 @@ export default async function handler(req, res) {
   const carrier_id = usdot_number || mc_number;
 
   try {
-    const fetchWithAuth = (endpoint) =>
-      fetch(`https://api.saferweb.com/carriers/${carrier_id}/${endpoint}`, {
-        headers: { Authorization: `Bearer ${SAFERWEB_API_KEY}` },
+    const fetchWithApiKey = (url) =>
+      fetch(url, {
+        headers: { 'x-api-key': SAFERWEB_API_KEY },
       }).then(res => res.json());
 
+    const snapshotUrl = mc_number
+      ? `https://saferwebapi.com/v2/mcmx/snapshot/${mc_number}`
+      : `https://saferwebapi.com/v2/usdot/snapshot/${usdot_number}`;
+
+    const inspectionUrl = `https://saferwebapi.com/v3/history/inspection/${carrier_id}`;
+    const violationUrl = `https://saferwebapi.com/v3/history/violation/${carrier_id}`;
+    const crashUrl = `https://saferwebapi.com/v3/history/crash/${carrier_id}`;
+
     const [snapshot, inspections, violations, crashes] = await Promise.all([
-      fetchWithAuth('snapshot'),
-      fetchWithAuth('records?recordType=inspection_record'),
-      fetchWithAuth('records?recordType=violation_record'),
-      fetchWithAuth('records?recordType=crash_record')
+      fetchWithApiKey(snapshotUrl),
+      fetchWithApiKey(inspectionUrl),
+      fetchWithApiKey(violationUrl),
+      fetchWithApiKey(crashUrl)
     ]);
 
-    const crash_count = (crashes.records || []).length;
-    const fatal_crashes = (crashes.records || []).filter(c => c.fatalities > 0).length;
-    const violations_count = (violations.records || []).length;
-    const inspection_count = (inspections.records || []).length;
+    const crashRecords = crashes.crash_records || [];
+    const crash_count = crashRecords.length;
+    const fatal_crashes = crashRecords.filter(c => (c.total_fatalities || c.fatalities || 0) > 0).length;
+    const violations_count = (violations.violation_records || []).length;
+    const inspection_count = (inspections.inspection_records || []).length;
 
     let score = 100;
     score -= violations_count * 2;
