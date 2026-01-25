@@ -9,8 +9,13 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'MC or USDOT number required' });
   }
 
-  const SAFERWEB_API_KEY = 'f954a18ce8b648c2be8925bcc94e7e28'; // Use secure .env later
-  const carrier_id = usdot_number || mc_number;
+  const SAFERWEB_API_KEY = process.env.SAFERWEB_API_KEY;
+  if (!SAFERWEB_API_KEY) {
+    return res.status(500).json({ error: 'Missing SAFERWEB_API_KEY configuration' });
+  }
+  const SAFERWEB_API_BASE_URL = process.env.SAFERWEB_API_BASE_URL || 'https://saferwebapi.com';
+  let resolved_usdot_number = usdot_number;
+  let carrier_id = usdot_number || mc_number;
 
   try {
     const fetchWithApiKey = (url) =>
@@ -20,20 +25,46 @@ export default async function handler(req, res) {
 
     // Snapshot: MC or USDOT
     const snapshotUrl = mc_number
-      ? `https://saferwebapi.com/v2/mcmx/snapshot/${mc_number}`
-      : `https://saferwebapi.com/v2/usdot/snapshot/${usdot_number}`;
+      ? `${SAFERWEB_API_BASE_URL}/v2/mcmx/snapshot/${mc_number}`
+      : `${SAFERWEB_API_BASE_URL}/v2/usdot/snapshot/${usdot_number}`;
+    let snapshot = {};
+    let inspections = {};
+    let violations = {};
+    let crashes = {};
 
-    // Historical records
-    const inspectionUrl = `https://saferwebapi.com/v3/history/inspection/${carrier_id}`;
-    const violationUrl  = `https://saferwebapi.com/v3/history/violation/${carrier_id}`;
-    const crashUrl      = `https://saferwebapi.com/v3/history/crash/${carrier_id}`;
+    if (mc_number) {
+      snapshot = (await fetchWithApiKey(snapshotUrl)) || {};
+      resolved_usdot_number =
+        snapshot.usdot_number ||
+        snapshot.usdot ||
+        snapshot.dot_number ||
+        snapshot.dotNumber ||
+        snapshot.usdotNumber ||
+        resolved_usdot_number;
+      carrier_id = resolved_usdot_number || carrier_id;
 
-    const [snapshot, inspections, violations, crashes] = await Promise.all([
-      fetchWithApiKey(snapshotUrl),
-      fetchWithApiKey(inspectionUrl),
-      fetchWithApiKey(violationUrl),
-      fetchWithApiKey(crashUrl)
-    ]);
+      const inspectionUrl = `${SAFERWEB_API_BASE_URL}/v3/history/inspection/${carrier_id}`;
+      const violationUrl  = `${SAFERWEB_API_BASE_URL}/v3/history/violation/${carrier_id}`;
+      const crashUrl      = `${SAFERWEB_API_BASE_URL}/v3/history/crash/${carrier_id}`;
+
+      [inspections, violations, crashes] = await Promise.all([
+        fetchWithApiKey(inspectionUrl),
+        fetchWithApiKey(violationUrl),
+        fetchWithApiKey(crashUrl)
+      ]);
+    } else {
+      const inspectionUrl = `${SAFERWEB_API_BASE_URL}/v3/history/inspection/${carrier_id}`;
+      const violationUrl  = `${SAFERWEB_API_BASE_URL}/v3/history/violation/${carrier_id}`;
+      const crashUrl      = `${SAFERWEB_API_BASE_URL}/v3/history/crash/${carrier_id}`;
+
+      [snapshot, inspections, violations, crashes] = await Promise.all([
+        fetchWithApiKey(snapshotUrl),
+        fetchWithApiKey(inspectionUrl),
+        fetchWithApiKey(violationUrl),
+        fetchWithApiKey(crashUrl)
+      ]);
+      snapshot = snapshot || {};
+    }
 
     const crashRecords   = crashes.crash_records || [];
     // Deduplicate crash events by report number (each crash may include multiple vehicle records)
@@ -111,7 +142,7 @@ export default async function handler(req, res) {
       carrier_name: snapshot.legal_name || 'N/A',
       dba:          snapshot.dba_name   || 'N/A',
       mc_number,
-      usdot_number: carrier_id,
+      usdot_number: resolved_usdot_number || carrier_id,
       carrier_status: status,
       total_score,
       grade,
@@ -128,7 +159,7 @@ export default async function handler(req, res) {
       error: true,
       error_message: error.message,
       mc_number,
-      usdot_number: carrier_id,
+      usdot_number: resolved_usdot_number || carrier_id,
       total_score: 0,
       grade: 'F',
       auto_reject: 'true',
