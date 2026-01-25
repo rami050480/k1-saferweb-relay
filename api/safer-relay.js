@@ -9,7 +9,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'MC or USDOT number required' });
   }
 
-  const SAFERWEB_API_KEY = 'f954a18ce8b648c2be8925bcc94e7e28'; // Use secure .env later
+  const SAFERWEB_API_KEY = process.env.SAFERWEB_API_KEY;
+  if (!SAFERWEB_API_KEY) {
+    return res.status(500).json({ error: 'Server configuration error' });
+  }
+  const SAFERWEB_API_BASE_URL = process.env.SAFERWEB_API_BASE_URL || 'https://saferwebapi.com';
   let resolved_usdot_number = usdot_number;
   let carrier_id = usdot_number || mc_number;
 
@@ -21,8 +25,8 @@ export default async function handler(req, res) {
 
     // Snapshot: MC or USDOT
     const snapshotUrl = mc_number
-      ? `https://saferwebapi.com/v2/mcmx/snapshot/${mc_number}`
-      : `https://saferwebapi.com/v2/usdot/snapshot/${usdot_number}`;
+      ? `${SAFERWEB_API_BASE_URL}/v2/mcmx/snapshot/${mc_number}`
+      : `${SAFERWEB_API_BASE_URL}/v2/usdot/snapshot/${usdot_number}`;
     let snapshot = {};
     let inspections = {};
     let violations = {};
@@ -39,9 +43,9 @@ export default async function handler(req, res) {
         resolved_usdot_number;
       carrier_id = resolved_usdot_number || carrier_id;
 
-      const inspectionUrl = `https://saferwebapi.com/v3/history/inspection/${carrier_id}`;
-      const violationUrl  = `https://saferwebapi.com/v3/history/violation/${carrier_id}`;
-      const crashUrl      = `https://saferwebapi.com/v3/history/crash/${carrier_id}`;
+      const inspectionUrl = `${SAFERWEB_API_BASE_URL}/v3/history/inspection/${carrier_id}`;
+      const violationUrl  = `${SAFERWEB_API_BASE_URL}/v3/history/violation/${carrier_id}`;
+      const crashUrl      = `${SAFERWEB_API_BASE_URL}/v3/history/crash/${carrier_id}`;
 
       [inspections, violations, crashes] = await Promise.all([
         fetchWithApiKey(inspectionUrl),
@@ -49,9 +53,9 @@ export default async function handler(req, res) {
         fetchWithApiKey(crashUrl)
       ]);
     } else {
-      const inspectionUrl = `https://saferwebapi.com/v3/history/inspection/${carrier_id}`;
-      const violationUrl  = `https://saferwebapi.com/v3/history/violation/${carrier_id}`;
-      const crashUrl      = `https://saferwebapi.com/v3/history/crash/${carrier_id}`;
+      const inspectionUrl = `${SAFERWEB_API_BASE_URL}/v3/history/inspection/${carrier_id}`;
+      const violationUrl  = `${SAFERWEB_API_BASE_URL}/v3/history/violation/${carrier_id}`;
+      const crashUrl      = `${SAFERWEB_API_BASE_URL}/v3/history/crash/${carrier_id}`;
 
       [snapshot, inspections, violations, crashes] = await Promise.all([
         fetchWithApiKey(snapshotUrl),
