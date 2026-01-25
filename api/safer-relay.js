@@ -50,9 +50,17 @@ export default async function handler(req, res) {
     const crash_count   = Object.keys(crashEventsMap).length;
     const fatal_crashes = Object.values(crashEventsMap).filter((e) => e.fatal).length;
 
-    // Violations count is based on number of violation records
+    // Violations count is deduplicated by report number (similar to crash/inspection logic)
     const violationRecords = violations.violation_records || [];
-    const violations_count = violationRecords.length;
+    const violations_count = new Set(
+      violationRecords.map((r) =>
+        r.report_number ||
+        r.report_no ||
+        r.reportNumber ||
+        r.report ||
+        r.reportNum
+      )
+    ).size;
 
     // Deduplicate inspection events by report number for inspection count
     const inspectionRecords = inspections.inspection_records || [];
