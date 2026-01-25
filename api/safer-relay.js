@@ -10,7 +10,8 @@ export default async function handler(req, res) {
   }
 
   const SAFERWEB_API_KEY = 'f954a18ce8b648c2be8925bcc94e7e28'; // Use secure .env later
-  const carrier_id = usdot_number || mc_number;
+  let resolved_usdot_number = usdot_number;
+  let carrier_id = usdot_number || mc_number;
 
   try {
     const fetchWithApiKey = (url) =>
@@ -22,14 +23,22 @@ export default async function handler(req, res) {
     const snapshotUrl = mc_number
       ? `https://saferwebapi.com/v2/mcmx/snapshot/${mc_number}`
       : `https://saferwebapi.com/v2/usdot/snapshot/${usdot_number}`;
+    const snapshot = await fetchWithApiKey(snapshotUrl);
+    resolved_usdot_number =
+      snapshot.usdot_number ||
+      snapshot.usdot ||
+      snapshot.dot_number ||
+      snapshot.dotNumber ||
+      snapshot.usdotNumber ||
+      resolved_usdot_number;
+    carrier_id = resolved_usdot_number || carrier_id;
 
     // Historical records
     const inspectionUrl = `https://saferwebapi.com/v3/history/inspection/${carrier_id}`;
     const violationUrl  = `https://saferwebapi.com/v3/history/violation/${carrier_id}`;
     const crashUrl      = `https://saferwebapi.com/v3/history/crash/${carrier_id}`;
 
-    const [snapshot, inspections, violations, crashes] = await Promise.all([
-      fetchWithApiKey(snapshotUrl),
+    const [inspections, violations, crashes] = await Promise.all([
       fetchWithApiKey(inspectionUrl),
       fetchWithApiKey(violationUrl),
       fetchWithApiKey(crashUrl)
@@ -111,7 +120,7 @@ export default async function handler(req, res) {
       carrier_name: snapshot.legal_name || 'N/A',
       dba:          snapshot.dba_name   || 'N/A',
       mc_number,
-      usdot_number: carrier_id,
+      usdot_number: resolved_usdot_number || carrier_id,
       carrier_status: status,
       total_score,
       grade,
@@ -128,7 +137,7 @@ export default async function handler(req, res) {
       error: true,
       error_message: error.message,
       mc_number,
-      usdot_number: carrier_id,
+      usdot_number: resolved_usdot_number || carrier_id,
       total_score: 0,
       grade: 'F',
       auto_reject: 'true',
