@@ -36,10 +36,31 @@ export default async function handler(req, res) {
     ]);
 
     const crashRecords   = crashes.crash_records || [];
-    const crash_count    = crashRecords.length;
-    const fatal_crashes  = crashRecords.filter(c => (c.total_fatalities || c.fatalities || 0) > 0).length;
-    const violations_count = (violations.violation_records || []).length;
-    const inspection_count = (inspections.inspection_records || []).length;
+    // Deduplicate crash events by report number (each crash may include multiple vehicle records)
+    const crashEventsMap = {};
+    crashRecords.forEach((rec) => {
+      const key = rec.report_number || rec.report_no || rec.reportNumber || rec.report || rec.reportNum;
+      if (!crashEventsMap[key]) {
+        crashEventsMap[key] = { fatal: false };
+      }
+      if ((rec.total_fatalities || rec.fatalities || 0) > 0) {
+        crashEventsMap[key].fatal = true;
+      }
+    });
+    const crash_count   = Object.keys(crashEventsMap).length;
+    const fatal_crashes = Object.values(crashEventsMap).filter((e) => e.fatal).length;
+
+    // Violations count is based on number of violation records
+    const violationRecords = violations.violation_records || [];
+    const violations_count = violationRecords.length;
+
+    // Deduplicate inspection events by report number for inspection count
+    const inspectionRecords = inspections.inspection_records || [];
+    const inspection_count = new Set(
+      inspectionRecords.map((r) =>
+        r.report_number || r.report_no || r.reportNumber || r.report || r.reportNum
+      )
+    ).size;
 
     // Weighted scoring
     const maxViolations  = 200;
