@@ -11,7 +11,7 @@ export default async function handler(req, res) {
 
   const SAFERWEB_API_KEY = process.env.SAFERWEB_API_KEY;
   if (!SAFERWEB_API_KEY) {
-    return res.status(500).json({ error: 'Server configuration error' });
+    return res.status(500).json({ error: 'Missing SAFERWEB_API_KEY configuration' });
   }
   const SAFERWEB_API_BASE_URL = process.env.SAFERWEB_API_BASE_URL || 'https://saferwebapi.com';
   let resolved_usdot_number = usdot_number;
