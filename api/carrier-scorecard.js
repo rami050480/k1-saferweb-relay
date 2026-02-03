@@ -20,27 +20,25 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch carrier data from safer-relay API (internal)
-    const baseUrl = process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}` 
-      : 'http://localhost:3000';
-    
-    const response = await fetch(`${baseUrl}/api/safer-relay`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mc_number })
+        // Fetch carrier data directly from SAFERWeb API
+    const apiKey = process.env.SAFERWEB_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'API key not configured' });
+    }
+
+    const response = await fetch(`https://saferwebapi.com/v2/mcmx/snapshot/${mc_number}`, {
+      method: 'GET',
+      headers: { 'x-api-key': apiKey }
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      return res.status(response.status).json({ 
-        error: 'Failed to fetch carrier data',
-        details: errorData 
+      return res.status(response.status).json({
+        error: 'Failed to fetch carrier data from SAFERWeb',
+        status: response.status
       });
     }
 
     const carrierData = await response.json();
-    
     // Transform and score the data
     const scorecard = calculateScorecard({
       carrier: carrierData,
