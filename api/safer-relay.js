@@ -9,9 +9,9 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'MC or USDOT number required' });
   }
 
-  const SAFERWEB_API_KEY = process.env.SAFERWEB_API_KEY;
-  if (!SAFERWEB_API_KEY) {
-    return res.status(500).json({ error: 'Missing SAFERWEB_API_KEY configuration' });
+  const SAFER_API_KEY = process.env.SAFER_API_KEY;
+  if (!SAFER_API_KEY) {
+    return res.status(500).json({ error: 'Missing SAFER_API_KEY configuration' });
   }
   const SAFERWEB_API_BASE_URL = process.env.SAFERWEB_API_BASE_URL || 'https://saferwebapi.com';
   let resolved_usdot_number = usdot_number;
@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   try {
     const fetchWithApiKey = (url) =>
       fetch(url, {
-        headers: { 'x-api-key': SAFERWEB_API_KEY },
+        headers: { 'x-api-key': SAFER_API_KEY },
       }).then(r => r.json());
 
     // Snapshot: MC or USDOT
